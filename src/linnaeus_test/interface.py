@@ -25,21 +25,24 @@ def run(share=True):
     }
     """
     with gr.Blocks(css=css) as demo:
-        input_box = gr.Textbox(label="Invoer")
-        input_submit_button = gr.Button("Uitvoer")
+        input_box = gr.Textbox(label="Tekst", submit_btn="Invoeren")
+        # input_submit_button = gr.Button("Uitvoer")
 
         model_names = ["Model A", "Model B"]
 
         def llm_output(text):
+            if text == "":
+                return ["", ""]
             return [model_name + ": " + text for model_name in model_names]
 
         with gr.Row():
             output_boxes = [gr.Textbox(label=model_name) for model_name in model_names]
-        input_submit_button.click(fn=llm_output, inputs=input_box, outputs=output_boxes)
+        input_box.submit(fn=llm_output, inputs=input_box, outputs=output_boxes)
         radio = gr.Radio(
             [model_names[0], "Even goed", model_names[1]],
             label="Welke uitvoer is beter?",
             elem_classes="radio-group",
         )
+        input_box = gr.Textbox(label="Feedback", submit_btn="Invoeren")
 
     demo.launch(share=share)
