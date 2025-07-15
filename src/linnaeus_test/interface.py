@@ -1,57 +1,56 @@
-# %%script false --no-raise-error
+from linnaeus_test.database import Database
+from linnaeus_test.llm_base import LLM_Base
 from linnaeus_test.manager import Manager
+from linnaeus_test.gradio_app import get_summarized_page
+from typing import Any
 
-import gradio as gr
 
+class Interface:
+    def __init__(self, llm_api_cfgs: dict[str, dict[str, Any]], model_presets: dict):
+        self.model_presets = [
+            self.merged_model_cfg(llm_api_cfgs, model_preset)
+            for model_preset in model_presets
+        ]
 
-def get_summarized_page(manager: Manager):
-    css = """
-    .radio-group {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr 1fr;
-    }
-    """
-    with gr.Blocks(css=css) as page:
-        browser_storage = gr.BrowserState()
-        user_session = browser_storage.storage_key
-        input_box = gr.Textbox(
-            label="Tekst",
-            placeholder="Dit is een voorbeeldtekst.",
-            submit_btn="Vat samen",
+    @staticmethod
+    def merged_model_cfg(llm_api_cfgs, model_preset):
+        model = model_preset["model"]
+        if model not in llm_api_cfgs:
+            raise ValueError(f"Model {model} not found in LLM API configuration.")
+        llm_api_cfg = llm_api_cfgs[model]
+        params = llm_api_cfg.get("defaults", {})
+        for k, v in model_preset.items():
+            if k not in ("model", "system-message"):
+                params[k] = v
+        return LLM_Base.create(
+            api=llm_api_cfg["api"],
+            model=model,
+            api_url=llm_api_cfg["url"],
+            api_key=llm_api_cfg["key"],
+            system_message=model_preset.get("system-message"),
+            model_params=params,
         )
 
-        model_names = ["Model A", "Model B"]
-        with gr.Row():
-            output_boxes = [gr.Textbox(label=model_name) for model_name in model_names]
+    def get_test_subjects(self):
+        return [
+            {
+                "id": i,
+                "model": model_preset.model,
+                "parameters": model_preset.model_params,
+                "system-message": model_preset.system_message,
+            }
+            for i, model_preset in enumerate(self.model_presets)
+        ]
 
-        @gr.on(input_box.submit, inputs=input_box, outputs=output_boxes)
-        def get_model_texts(text: str):
-            if text == "":
-                return gr.skip()
-            model_texts = manager.get_model_texts(user_session, text)
-            return model_texts
-
-        EQUAL_EVALUATION = len(model_names)
-        eval_radio = gr.Radio(
-            [
-                (model_names[0], 0),  #
-                ("Even goed", EQUAL_EVALUATION),
-                (model_names[1], 1),
-            ],
-            label="Welk model geeft een betere samenvatting?",
-            elem_classes="radio-group",
-        )
-        feedback_box = gr.Textbox(
-            label="Feedback", placeholder="<verplicht>", submit_btn="Stuur"
-        )
-
-        @gr.on(feedback_box.submit, inputs=[eval_radio, feedback_box])
-        def submit_feedback(eval: int, feedback: str):
-            if eval is None:
-                raise gr.Error("Geef aan welk model beter is.")
-            if feedback == "":
-                raise gr.Error("Motiveer de evaluatie.")
-            print(eval, feedback)
-            manager.process_feedback(user_session, eval, feedback)
-
-    return page
+    def launch(self, database_filename: str, share=False) -> None:
+        database = Database(database_filename)
+        # a.export_to_csv('test.csv')
+        # exit(0)
+        manager = Manager(self.model_presets, database)
+        get_summarized_page(manager).launch(share=share)
+        '''
+        for model_preset in self.model_presets:
+            content = model_preset.call("I am going to Paris, what should I see?")
+            print(content)
+            print(model_preset.model)
+        '''

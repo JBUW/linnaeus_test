@@ -5,7 +5,13 @@ import sqlite3
 
 class Database:
     table_name = "user_evaluation"
-    columns = ["user_session", "model_a", "model_b", "best_model", "feedback"]
+    columns = {
+        "user_session": "TEXT NOT NULL",
+        "model_a": "INTEGER NOT NULL",
+        "model_b": "INTEGER NOT NULL",
+        "best_model": "CHAR(1) CHECK (best_model IN ('A', 'B', '='))",
+        "feedback": "TEXT",
+    }
 
     def __init__(self, db=None, force_creation=False):
         if db is None:
@@ -22,7 +28,7 @@ class Database:
         if create_db:
             connection = sqlite3.connect(self.db)
             connection.execute(
-                f"CREATE TABLE {__class__.table_name}({', '.join(__class__.columns)}, Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
+                f"CREATE TABLE {__class__.table_name}({', '.join(f"{name} {definition}" for name, definition in __class__.columns.items())}, Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
             )
 
     def add_evaluation(self, user_session, model_a, model_b, best_model, feedback):
@@ -39,7 +45,7 @@ class Database:
         connection = sqlite3.connect(self.db)
         with connection:
             connection.execute(
-                f"INSERT INTO {__class__.table_name} ({', '.join(__class__.columns)}) VALUES (?, ?, ?, ?, ?)",
+                f"INSERT INTO {__class__.table_name} ({', '.join(__class__.columns.keys())}) VALUES (?, ?, ?, ?, ?)",
                 (user_session, model_a, model_b, "AB="[best_model], feedback),
             )
         connection.close()
