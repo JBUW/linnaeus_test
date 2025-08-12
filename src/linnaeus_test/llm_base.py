@@ -7,8 +7,8 @@ import typing
 
 
 @dataclasses.dataclass
-class LLM_Base(abc.ABC):
-    name_to_api_class: typing.ClassVar[dict[str, "LLM_Base"]] = {}
+class LLMBase(abc.ABC):
+    name_to_api_class: typing.ClassVar[dict[str, "LLMBase"]] = {}
 
     api_url: str
     api_key: str
@@ -36,14 +36,14 @@ class LLM_Base(abc.ABC):
         pass
 
     @staticmethod
-    def to_message_list(messages: dict) -> list:
+    def to_message_list(messages: dict[str, str]) -> list[dict[str, str]]:
         return [
             {"role": role, "content": content} for role, content in messages.items()
         ]
 
 
 # Automatically import all subclasses.
-if len(LLM_Base.name_to_api_class) == 0:
+if len(LLMBase.name_to_api_class) == 0:
     subclass_dir = "llms"
     subclass_pattern = os.path.join(os.path.dirname(__file__), subclass_dir, "*.py")
     for filename in glob.glob(subclass_pattern):

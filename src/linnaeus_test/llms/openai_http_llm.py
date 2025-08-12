@@ -1,16 +1,17 @@
-from ..llm_base import LLM_Base
+from ..llm_base import LLMBase
 
 import dataclasses
 import requests
+from typing import Final
 
 
 @dataclasses.dataclass
-class OPENAI_HTTP_LLM(LLM_Base):
-    api_identifier: str = "openai"
+class OpenAIHttpLLM(LLMBase):
+    api_identifier: Final[str] = "openai"
     api_version: str = "2025-04-01-preview"
 
     @property
-    def headers(self) -> dict:
+    def headers(self) -> dict[str, str]:
         return {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",

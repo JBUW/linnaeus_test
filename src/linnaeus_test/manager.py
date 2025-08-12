@@ -1,40 +1,38 @@
 from linnaeus_test.database import Database
-from linnaeus_test.llm_base import LLM_Base
+from linnaeus_test.llm_base import LLMBase
 
+import concurrent.futures
 import dataclasses
+import random
+
 
 @dataclasses.dataclass
 class Manager:
-    model_presets: LLM_Base
+    model_presets: list[LLMBase]
     database: Database
 
     def __post_init__(self):
-        self.session_to_model_ids = {}
+        self.session_to_model_presets = {}
+        self.rng = random.Random()
 
-    def get_model_texts(self, user_session, text):
-        model_ids = self.get_model_ids(user_session)
-        return [self.model_presets[model_id].call(text) for model_id in model_ids]
+    def get_model_texts(self, user_session, text: str) -> tuple[str, str]:
+        user_model_presets = [
+            model_preset for model_preset in self.rng.sample(self.model_presets, 2)
+        ]
+        self.session_to_model_presets[user_session] = user_model_presets
 
-    def get_model_ids(self, user_session):
-        if user_session in self.session_to_model_ids:
-            *model_ids, processed_feedback = self.session_to_model_ids[user_session]
-            if processed_feedback:
-                self.session_to_model_ids[user_session] = [
-                    (model_ids[0] + 2) % len(self.model_presets),
-                    (model_ids[1] + 2) % len(self.model_presets),
-                    False,
-                ]
-        else:
-            self.session_to_model_ids[user_session] = [0, 1, False]
-        return self.session_to_model_ids[user_session]
-
-    def process_feedback(self, user_session, eval, feedback):
-        if user_session not in self.session_to_model_ids:
-            return
-        *models, processed_feedback = self.session_to_model_ids[user_session]
-        if eval in (0, 1):
-            print(
-                f"{'Updated' if processed_feedback else 'New'}: {models[eval]} is better."
+        # Make model calls in parallel
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            return list(
+                executor.map(lambda preset: preset.call(text), user_model_presets)
             )
-        self.session_to_model_ids[user_session][2] = True
-        self.database.add_evaluation(user_session, models[0], models[1], eval, feedback)
+
+    def process_evaluation(self, user_session, **eval_data):
+        if user_session not in self.session_to_model_presets:
+            raise ValueError(f"User session not found.")
+        self.database.add_evaluation(
+            user_session=user_session,
+            model_presets=self.session_to_model_presets[user_session],
+            **eval_data,
+        )
+        del self.session_to_model_presets[user_session]
